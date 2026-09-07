@@ -15,16 +15,17 @@ import net.minecraft.nbt.NbtHelper
 import net.minecraft.nbt.NbtOps
 import net.minecraft.nbt.StringNbtReader
 import net.minecraft.registry.Registries
-import net.minecraft.screen.GenericContainerScreenHandler
 import net.minecraft.screen.NamedScreenHandlerFactory
 import net.minecraft.screen.ScreenHandler
 import net.minecraft.screen.ScreenHandlerType
+import net.minecraft.screen.slot.Slot
 import net.minecraft.screen.slot.SlotActionType
 import net.minecraft.text.Text
 import net.minecraft.util.Identifier
 import tech.sethi.pebbles.crates.PebblesCrate
 import tech.sethi.pebbles.crates.PebblesCrate.server
 import tech.sethi.pebbles.crates.lootcrates.CrateConfig
+import tech.sethi.pebbles.crates.lootcrates.CrateEventHandler
 import tech.sethi.pebbles.crates.lootcrates.Prize
 import tech.sethi.pebbles.crates.util.ParseableMessage
 import tech.sethi.pebbles.crates.util.ParseableName
@@ -33,32 +34,57 @@ import tech.sethi.pebbles.crates.util.setLore
 class PrizeDisplayScreenHandlerFactory(private val title: Text, private val crateConfig: CrateConfig) :
     NamedScreenHandlerFactory {
     override fun createMenu(syncId: Int, inv: PlayerInventory, player: PlayerEntity): ScreenHandler {
-        var currentPage = 0
-
         val crateItems = crateConfig.prize
-        val handler = object : GenericContainerScreenHandler(
-            ScreenHandlerType.GENERIC_9X6, syncId, inv, CrateInventory(crateItems, currentPage), 6
-        ) {
-            override fun onSlotClick(
-                slotNumber: Int, button: Int, action: SlotActionType, playerEntity: PlayerEntity
-            ) {
-                if (slotNumber == 45) { // Previous page arrow
-                    if (currentPage > 0) {
-                        currentPage--
-                        (this.inventory as CrateInventory).populateInventory(crateItems, currentPage)
+        val crateInv = CrateInventory(crateItems, 0)
+        // Row pixel offset used by GenericContainerScreenHandler for 6 rows: (rows - 4) * 18
+        val rowOffset = (6 - 4) * 18
+
+        return object : ScreenHandler(ScreenHandlerType.GENERIC_9X6, syncId) {
+            var currentPage = 0
+
+            init {
+                checkSize(crateInv, 54)
+                // Display slots (0-53): canTakeItems=false blocks pickup at MC's own slot level,
+                // which keeps client and server in sync without manual cursor correction.
+                for (row in 0 until 6) {
+                    for (col in 0 until 9) {
+                        addSlot(object : Slot(crateInv, col + row * 9, 8 + col * 18, 18 + row * 18) {
+                            override fun canTakeItems(playerEntity: PlayerEntity) = false
+                            override fun canInsert(stack: ItemStack) = false
+                        })
                     }
-                } else if (slotNumber == 53) { // Next page arrow
-                    if (currentPage < (crateItems.size - 1) / 45) {
-                        currentPage++
-                        (this.inventory as CrateInventory).populateInventory(crateItems, currentPage)
+                }
+                // Player main inventory (54-80)
+                for (row in 0 until 3) {
+                    for (col in 0 until 9) {
+                        addSlot(Slot(inv, col + row * 9 + 9, 8 + col * 18, 103 + row * 18 + rowOffset + 18))
                     }
-                } else {
-                    return
+                }
+                // Hotbar (81-89)
+                for (col in 0 until 9) {
+                    addSlot(Slot(inv, col, 8 + col * 18, 161 + rowOffset + 18))
                 }
             }
-        }
-        return handler
 
+            override fun canUse(player: PlayerEntity) = true
+
+            override fun quickMove(player: PlayerEntity, slot: Int): ItemStack = ItemStack.EMPTY
+
+            override fun onSlotClick(slotIndex: Int, button: Int, action: SlotActionType, playerEntity: PlayerEntity) {
+                if (slotIndex == 45 && currentPage > 0) {
+                    currentPage--
+                    crateInv.populateInventory(crateItems, currentPage)
+                    sendContentUpdates()
+                } else if (slotIndex == 53 && currentPage < (crateItems.size - 1) / 45) {
+                    currentPage++
+                    crateInv.populateInventory(crateItems, currentPage)
+                    sendContentUpdates()
+                }
+                // Always delegate to super so MC handles its own cursor/acknowledgment
+                // sync. The locked slots above prevent any actual item movement.
+                super.onSlotClick(slotIndex, button, action, playerEntity)
+            }
+        }
     }
 
     override fun getDisplayName(): Text {
@@ -90,9 +116,7 @@ class CrateInventory(crateItems: List<Prize>, currentPage: Int) : SimpleInventor
             if (prize.nbt != null) {
                 val parsedNbt = StringNbtReader.parse(prize.nbt)
 
-                val namespacedKeyPattern = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
-
-                val isLegacy = parsedNbt.keys.any { !namespacedKeyPattern.matches(it) }
+                val isLegacy = parsedNbt.keys.any { !CrateEventHandler.NAMESPACED_KEY_PATTERN.matches(it) }
                 if (isLegacy) {
                     val legacyNbt = NbtCompound().apply {
                         putString("id", itemStack.registryEntry.idAsString)
@@ -120,9 +144,8 @@ class CrateInventory(crateItems: List<Prize>, currentPage: Int) : SimpleInventor
             if (prize.lore != null) {
                 val lore = prize.lore
                 val parsedPrizeLore = lore.map {
-                    val message = it.replace("{chance}", roundedChance)
-                    message.replace("{prize_name}", roundedChance)
-                    ParseableMessage(message, prizeName = "placeholder").returnMessageAsStyledText()
+                    val message = it.replace("{chance}", roundedChance).replace("{prize_name}", prize.name)
+                    ParseableMessage(message, prizeName = prize.name).returnMessageAsStyledText()
                 }
                 setLore(itemStack, parsedPrizeLore)
             } else {

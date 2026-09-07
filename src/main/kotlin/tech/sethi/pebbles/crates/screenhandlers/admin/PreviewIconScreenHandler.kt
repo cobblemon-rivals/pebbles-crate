@@ -76,12 +76,12 @@ class PreviewIconScreenHandler(
 
             // Update or add the crate configuration
             val updatedPrizes = ArrayList<Prize>()
-            for (i in 0 until 18) {
+            val prizes = currentCrateConfigs.first { it.crateName == crateName }.prize
+            for (i in 0 until minOf(18, prizes.size)) {
                 val stack = inventory.getStack(i)
                 if (!stack.isEmpty) {
                     getWeightFromLore(stack).let { weight ->
-                        val prize = currentCrateConfigs.first { it.crateName == crateName }.prize[i]
-                        updatedPrizes.add(prize.copy(chance = weight.toInt()))
+                        updatedPrizes.add(prizes[i].copy(chance = weight.toInt()))
                     }
                 }
             }

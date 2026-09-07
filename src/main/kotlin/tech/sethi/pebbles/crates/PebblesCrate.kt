@@ -34,7 +34,7 @@ import tech.sethi.pebbles.crates.lootcrates.CrateEventHandler
 import tech.sethi.pebbles.crates.particles.CrateParticles
 import tech.sethi.pebbles.crates.screenhandlers.PrizeDisplayScreenHandlerFactory
 import tech.sethi.pebbles.crates.util.*
-import tech.sethi.pebbleslootcrate.commands.CrateCommand
+import tech.sethi.pebbles.crates.commands.CrateCommand
 import java.util.*
 
 object PebblesCrate : ModInitializer {
@@ -42,7 +42,7 @@ object PebblesCrate : ModInitializer {
     const val MOD_ID = "pebbles_crate"
     val cratesInUse = Collections.synchronizedSet(mutableSetOf<WorldBlockPos>())
     val playerCooldowns: MutableMap<UUID, Long> = Collections.synchronizedMap(mutableMapOf())
-    val tasks: MutableMap<Long, MutableList<Task>> = mutableMapOf()
+    val tasks: MutableMap<Long, MutableList<Task>> = Collections.synchronizedMap(mutableMapOf())
 
     var server: MinecraftServer? = null
 
@@ -82,8 +82,8 @@ object PebblesCrate : ModInitializer {
 
             // Check if the clicked position is in the crate data
             if (worldBlockPos in savedCrateData) {
-                var crateName = savedCrateData[worldBlockPos]
-                val crateConfig = CrateConfigManager.getCrateConfig(crateName!!)
+                var crateName = savedCrateData[worldBlockPos] ?: return@UseBlockCallback ActionResult.PASS
+                val crateConfig = CrateConfigManager.getCrateConfig(crateName)
 
                 if (crateConfig != null && crateConfig.screenName != null) {
                     crateName = crateConfig.screenName

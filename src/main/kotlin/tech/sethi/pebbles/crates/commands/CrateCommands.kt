@@ -1,4 +1,4 @@
-package tech.sethi.pebbleslootcrate.commands
+package tech.sethi.pebbles.crates.commands
 
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.IntegerArgumentType
@@ -29,15 +29,14 @@ object CrateCommand {
             val player = source.player as? PlayerEntity
             player != null && (source.hasPermissionLevel(2) || isLuckPermsPresent() && getLuckPermsApi()?.userManager?.getUser(
                 player.uuid
-            )!!.cachedData.permissionData.checkPermission("pebbles.admin.crate").asBoolean()) || source.entity == null
+            )?.cachedData?.permissionData?.checkPermission("pebbles.admin.crate")?.asBoolean() == true) || source.entity == null
         }
 
         val crateCommand = literal("crate").requires { source ->
             val player = source.player as? PlayerEntity
             player != null && (source.hasPermissionLevel(2) || isLuckPermsPresent() && getLuckPermsApi()?.userManager?.getUser(
                 player.uuid
-            )!!.cachedData.permissionData.checkPermission("pebbles.admin.crate")
-                .asBoolean()) || source.entity == null
+            )?.cachedData?.permissionData?.checkPermission("pebbles.admin.crate")?.asBoolean() == true) || source.entity == null
         }.executes { context ->
             val source = context.source
 

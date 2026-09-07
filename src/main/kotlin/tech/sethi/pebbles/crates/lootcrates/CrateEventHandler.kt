@@ -46,6 +46,7 @@ class CrateEventHandler(
     private val pos: BlockPos = worldBlockPos.pos
     companion object {
         const val COOLDOWN_TIME = 8000L
+        val NAMESPACED_KEY_PATTERN = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
     }
 
     private var lastFloatingPrizeItemEntity: FloatingPrizeItemEntity? = null
@@ -98,9 +99,7 @@ class CrateEventHandler(
         if (prize.nbt?.isNotBlank() == true && prize.nbt != "{}" && prize.nbt != "null") {
                 val parsedNbt = StringNbtReader.parse(prize.nbt)
 
-                val namespacedKeyPattern = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
-
-                val isLegacy = parsedNbt.keys.any { !namespacedKeyPattern.matches(it) }
+                val isLegacy = parsedNbt.keys.any { !NAMESPACED_KEY_PATTERN.matches(it) }
                 if (isLegacy) {
                     val legacyNbt = NbtCompound().apply {
                         putString("id", itemStack.registryEntry.idAsString)

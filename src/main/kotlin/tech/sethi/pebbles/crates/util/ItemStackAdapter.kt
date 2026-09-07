@@ -17,6 +17,8 @@ import tech.sethi.pebbles.crates.PebblesCrate
 import tech.sethi.pebbles.crates.PebblesCrate.server
 import java.lang.reflect.Type
 
+private val NAMESPACED_KEY_PATTERN = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
+
 data class ItemConfig(
     val itemId: String, val nbt: String?, val amount: Int, val displayName: String?
 ) {
@@ -28,9 +30,7 @@ data class ItemConfig(
         if (nbt != null) {
             val parsedNbt = StringNbtReader.parse(nbt)
 
-            val namespacedKeyPattern = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
-
-            val isLegacy = parsedNbt.keys.any { !namespacedKeyPattern.matches(it) }
+            val isLegacy = parsedNbt.keys.any { !NAMESPACED_KEY_PATTERN.matches(it) }
             if (isLegacy) {
                 val legacyNbt = NbtCompound().apply {
                     putString("id", itemStack.registryEntry.idAsString)
@@ -77,7 +77,7 @@ class ItemStackTypeAdapter : JsonSerializer<ItemStack>, JsonDeserializer<ItemSta
         // Save NBT data
         if (itemStack.componentChanges.size() > 0) {
             val nbtString = ComponentChanges.CODEC.encodeStart(PebblesCrate.nbtOps, itemStack.componentChanges).result().orElse(null)
-            jsonObject.addProperty("nbt", nbtString.asString())
+            if (nbtString != null) jsonObject.addProperty("nbt", nbtString.asString())
         }
         if (itemStack.componentChanges.size() > 0 && itemStack.get(DataComponentTypes.LORE)?.lines?.isNotEmpty() == true
         ) {

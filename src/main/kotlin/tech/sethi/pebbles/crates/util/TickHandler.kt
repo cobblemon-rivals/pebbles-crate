@@ -12,7 +12,7 @@ class TickHandler {
     }
 
     private fun processTasks(server: MinecraftServer) {
-        val currentTick = server.worlds.first().time
+        val currentTick = server.worlds.firstOrNull()?.time ?: return
 
         PebblesCrate.tasks[currentTick]?.let { tasks ->
             for (task in tasks) {

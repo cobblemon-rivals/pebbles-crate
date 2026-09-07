@@ -39,8 +39,10 @@ class CrateDataManager {
                     }
                 }
             }
+        } catch (e: java.io.FileNotFoundException) {
+            // No data file yet, start with empty map
         } catch (e: IOException) {
-            // File not found, assume no data yet
+            e.printStackTrace()
         }
 
         // Auto-migrate legacy data to new format
