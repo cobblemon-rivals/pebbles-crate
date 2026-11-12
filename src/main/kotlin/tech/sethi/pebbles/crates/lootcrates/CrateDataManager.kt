@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import tech.sethi.pebbles.crates.util.WorldBlockPos
+import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
@@ -22,6 +23,18 @@ class CrateDataManager {
      * to new format (world + coordinate) using overworld as the default world.
      */
     fun loadCrateData(): Map<WorldBlockPos, String> {
+        val now = System.currentTimeMillis()
+        cache?.let { if (now - lastCheck < CHECK_INTERVAL_MS) return it }
+        lastCheck = now
+        val mtime = File(CRATE_DATA_FILE).lastModified()
+        cache?.let { if (mtime == cacheMtime) return it }
+        val data = readCrateData()
+        cache = data
+        cacheMtime = File(CRATE_DATA_FILE).lastModified()
+        return data
+    }
+
+    private fun readCrateData(): Map<WorldBlockPos, String> {
         val crateData = HashMap<WorldBlockPos, String>()
         var needsMigration = false
 
@@ -73,8 +86,18 @@ class CrateDataManager {
             FileWriter(CRATE_DATA_FILE).use { writer ->
                 GSON.toJson(rawCrateData, CRATE_DATA_TYPE, writer)
             }
+            cache = HashMap(crateData)
+            cacheMtime = File(CRATE_DATA_FILE).lastModified()
+            lastCheck = System.currentTimeMillis()
         } catch (e: IOException) {
             e.printStackTrace()
         }
+    }
+
+    companion object {
+        private const val CHECK_INTERVAL_MS = 1000L
+        private var cache: Map<WorldBlockPos, String>? = null
+        private var cacheMtime = -1L
+        private var lastCheck = 0L
     }
 }
