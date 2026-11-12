@@ -226,7 +226,7 @@ object PebblesCrate : ModInitializer {
             if (worldBlockPos in blacklist) continue
 
             val pos = worldBlockPos.pos
-            world.getChunk(pos.x shr 4, pos.z shr 4)
+            if (!world.isChunkLoaded(pos.x shr 4, pos.z shr 4)) continue
 
             val playersNearby =
                 world.getPlayersByDistance(pos, 16.0) // Only get players within 16 blocks of the crate block
