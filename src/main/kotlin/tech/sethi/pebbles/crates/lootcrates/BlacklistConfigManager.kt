@@ -26,6 +26,18 @@ class BlacklistConfigManager {
      * Automatically migrates legacy format to new format using overworld as default.
      */
     fun getBlacklist(): Set<WorldBlockPos> {
+        val now = System.currentTimeMillis()
+        cache?.let { if (now - lastCheck < CHECK_INTERVAL_MS) return it }
+        lastCheck = now
+        val mtime = Files.getLastModifiedTime(blacklistPath).toMillis()
+        cache?.let { if (mtime == cacheMtime) return it }
+        val data = readBlacklist()
+        cache = data
+        cacheMtime = Files.getLastModifiedTime(blacklistPath).toMillis()
+        return data
+    }
+
+    private fun readBlacklist(): Set<WorldBlockPos> {
         var needsMigration = false
         val blacklist = Files.readAllLines(blacklistPath).mapNotNull { line ->
             if (line.isBlank()) return@mapNotNull null
@@ -73,6 +85,9 @@ class BlacklistConfigManager {
             blacklistPath,
             blacklist.joinToString("\n") { "${it.worldId},${it.pos.x},${it.pos.y},${it.pos.z}" }
         )
+        cache = blacklist.toSet()
+        cacheMtime = Files.getLastModifiedTime(blacklistPath).toMillis()
+        lastCheck = System.currentTimeMillis()
     }
 
     fun addToBlacklist(worldPos: WorldBlockPos) {
@@ -87,5 +102,12 @@ class BlacklistConfigManager {
         val blacklist = getBlacklist().toMutableSet()
         blacklist.remove(worldPos)
         saveBlacklist(blacklist)
+    }
+
+    companion object {
+        private const val CHECK_INTERVAL_MS = 1000L
+        private var cache: Set<WorldBlockPos>? = null
+        private var cacheMtime = -1L
+        private var lastCheck = 0L
     }
 }

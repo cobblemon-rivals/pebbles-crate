@@ -35,18 +35,28 @@ class PrizeDisplayScreenHandlerFactory(private val title: Text, private val crat
     NamedScreenHandlerFactory {
     override fun createMenu(syncId: Int, inv: PlayerInventory, player: PlayerEntity): ScreenHandler {
         val crateItems = crateConfig.prize
-        val crateInv = CrateInventory(crateItems, 0)
+        val paged = crateItems.size > 45
+        val rows = if (paged) 6 else ((crateItems.size + 8) / 9).coerceIn(1, 6)
+        val crateInv = CrateInventory(crateItems, 0, rows)
         // Row pixel offset used by GenericContainerScreenHandler for 6 rows: (rows - 4) * 18
-        val rowOffset = (6 - 4) * 18
+        val rowOffset = (rows - 4) * 18
+        val type = when (rows) {
+            1 -> ScreenHandlerType.GENERIC_9X1
+            2 -> ScreenHandlerType.GENERIC_9X2
+            3 -> ScreenHandlerType.GENERIC_9X3
+            4 -> ScreenHandlerType.GENERIC_9X4
+            5 -> ScreenHandlerType.GENERIC_9X5
+            else -> ScreenHandlerType.GENERIC_9X6
+        }
 
-        return object : ScreenHandler(ScreenHandlerType.GENERIC_9X6, syncId) {
+        return object : ScreenHandler(type, syncId) {
             var currentPage = 0
 
             init {
-                checkSize(crateInv, 54)
+                checkSize(crateInv, rows * 9)
                 // Display slots (0-53): canTakeItems=false blocks pickup at MC's own slot level,
                 // which keeps client and server in sync without manual cursor correction.
-                for (row in 0 until 6) {
+                for (row in 0 until rows) {
                     for (col in 0 until 9) {
                         addSlot(object : Slot(crateInv, col + row * 9, 8 + col * 18, 18 + row * 18) {
                             override fun canTakeItems(playerEntity: PlayerEntity) = false
@@ -71,11 +81,11 @@ class PrizeDisplayScreenHandlerFactory(private val title: Text, private val crat
             override fun quickMove(player: PlayerEntity, slot: Int): ItemStack = ItemStack.EMPTY
 
             override fun onSlotClick(slotIndex: Int, button: Int, action: SlotActionType, playerEntity: PlayerEntity) {
-                if (slotIndex == 45 && currentPage > 0) {
+                if (paged && slotIndex == 45 && currentPage > 0) {
                     currentPage--
                     crateInv.populateInventory(crateItems, currentPage)
                     sendContentUpdates()
-                } else if (slotIndex == 53 && currentPage < (crateItems.size - 1) / 45) {
+                } else if (paged && slotIndex == 53 && currentPage < (crateItems.size - 1) / 45) {
                     currentPage++
                     crateInv.populateInventory(crateItems, currentPage)
                     sendContentUpdates()
@@ -93,7 +103,7 @@ class PrizeDisplayScreenHandlerFactory(private val title: Text, private val crat
 }
 
 
-class CrateInventory(crateItems: List<Prize>, currentPage: Int) : SimpleInventory(54) {
+class CrateInventory(crateItems: List<Prize>, currentPage: Int, rows: Int = 6) : SimpleInventory(rows * 9) {
     init {
         populateInventory(crateItems, currentPage)
     }
@@ -156,6 +166,8 @@ class CrateInventory(crateItems: List<Prize>, currentPage: Int) : SimpleInventor
                 set(DataComponentTypes.CUSTOM_NAME, parsedName)
             })
         }
+
+        if (size() < 54) return
 
         // Fill the bottom row with gray stained glass
         for (i in 45..53) {
